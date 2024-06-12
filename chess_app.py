@@ -12,14 +12,15 @@ class ChessApp:
         self.canvas = tk.Canvas(root, width=480, height=480)
         self.canvas.pack()
         
-        self.update_board()
+        self.canvas.bind("<Button-1>", self.on_click)
+        self.canvas.bind("<B1-Motion>", self.on_drag)
+        self.canvas.bind("<ButtonRelease-1>", self.on_drop)
         
-        self.move_entry = tk.Entry(root)
-        self.move_entry.pack()
-        
-        self.move_button = tk.Button(root, text="Make Move", command=self.make_move)
-        self.move_button.pack()
+        self.selected_piece = None
+        self.selected_square = None
 
+        self.update_board()
+    
     def draw_board(self):
         colors = ["#f0d9b5", "#b58863"]
         for row in range(8):
@@ -41,23 +42,41 @@ class ChessApp:
             col = square % 8
             x = col * 60 + 30
             y = row * 60 + 30
-            self.canvas.create_text(x, y, text=piece_symbols[piece.symbol()], font=("Arial", 32), fill="black")
+            self.canvas.create_text(x, y, text=piece_symbols[piece.symbol()], font=("Arial", 32), fill="black", tags="piece")
 
     def update_board(self):
         self.canvas.delete("all")
         self.draw_board()
         self.draw_pieces()
-        
-    def make_move(self):
-        move = self.move_entry.get()
-        try:
-            self.board.push_san(move)
-            self.update_board()
-            if not self.board.is_game_over():
-                self.computer_move()
-        except ValueError:
-            print("Invalid move")
+
+    def on_click(self, event):
+        col = event.x // 60
+        row = 7 - (event.y // 60)
+        self.selected_square = chess.square(col, row)
+        piece = self.board.piece_at(self.selected_square)
+        if piece:
+            self.selected_piece = piece
+            self.canvas.tag_raise("piece")
     
+    def on_drag(self, event):
+        if self.selected_piece:
+            self.canvas.delete("selected_piece")
+            self.canvas.create_text(event.x, event.y, text=self.selected_piece.symbol().upper() if self.selected_piece.color else self.selected_piece.symbol().lower(), font=("Arial", 32), fill="red", tags="selected_piece")
+    
+    def on_drop(self, event):
+        if self.selected_piece:
+            col = event.x // 60
+            row = 7 - (event.y // 60)
+            target_square = chess.square(col, row)
+            move = chess.Move(self.selected_square, target_square)
+            if move in self.board.legal_moves:
+                self.board.push(move)
+                self.update_board()
+                if not self.board.is_game_over():
+                    self.computer_move()
+            self.selected_piece = None
+            self.selected_square = None
+
     def computer_move(self):
         result = self.engine.play(self.board, chess.engine.Limit(time=2.0))
         self.board.push(result.move)

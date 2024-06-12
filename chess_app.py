@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import messagebox, filedialog
+from tkinter import messagebox, filedialog, simpledialog
 import chess
 import chess.pgn
 import chess.engine
@@ -108,7 +108,9 @@ class ChessApp:
             move = chess.Move(self.selected_square, target_square)
             if move in self.board.legal_moves:
                 if chess.Move.from_uci(f"{chess.square_name(self.selected_square)}{chess.square_name(target_square)}q") in self.board.legal_moves and self.selected_piece.piece_type == chess.PAWN and (row == 0 or row == 7):
-                    move = chess.Move(self.selected_square, target_square, promotion=chess.QUEEN)
+                    piece = simpledialog.askstring("Promotion", "Promote to (q, r, b, n):", initialvalue="q")
+                    if piece in ["q", "r", "b", "n"]:
+                        move = chess.Move(self.selected_square, target_square, promotion=chess.Piece.from_symbol(piece).piece_type)
                 self.board.push(move)
                 self.last_move = move
                 self.update_board()
@@ -123,14 +125,18 @@ class ChessApp:
             self.update_board()
 
     def computer_move(self):
-        depth = self.ai_difficulty.get()
-        result = self.engine.play(self.board, chess.engine.Limit(depth=depth))
-        self.board.push(result.move)
-        self.last_move = result.move
-        self.update_board()
-        self.update_move_list()
-        if self.board.is_game_over():
-            self.display_game_over()
+        try:
+            depth = self.ai_difficulty.get()
+            result = self.engine.play(self.board, chess.engine.Limit(depth=depth))
+            self.board.push(result.move)
+            self.last_move = result.move
+            self.update_board()
+            self.update_move_list()
+            if self.board.is_game_over():
+                self.display_game_over()
+        except Exception as e:
+            print(f"Error in computer move: {e}")
+            tk.messagebox.showerror("Error", "An error occurred while making the computer move.")
 
     def update_move_list(self):
         self.move_list.delete(0, tk.END)
@@ -182,19 +188,23 @@ class ChessApp:
     def load_game(self):
         file_path = filedialog.askopenfilename(filetypes=[("PGN files", "*.pgn"), ("All files", "*.*")])
         if file_path:
-            with open(file_path, "r") as f:
-                game = chess.pgn.read_game(f)
-                self.board = game.board()
-                for move in game.mainline_moves():
-                    self.board.push(move)
-                self.update_board()
-                self.update_move_list()
+            try:
+                with open(file_path, "r") as f:
+                    game = chess.pgn.read_game(f)
+                    self.board = game.board()
+                    for move in game.mainline_moves():
+                        self.board.push(move)
+                    self.update_board()
+                    self.update_move_list()
+            except Exception as e:
+                print(f"Error loading game: {e}")
+                tk.messagebox.showerror("Error", "An error occurred while loading the game.")
 
     def __del__(self):
         self.engine.quit()
 
 if __name__ == "__main__":
-    engine_path = r"D:\stockfish-windows-x86-64-avx2\stockfish\stockfish-windows-x86-64-avx2.exe"
+    engine_path = r"stockfish\stockfish-windows-x86-64-avx2.exe"
     root = tk.Tk()
     app = ChessApp(root, engine_path)
     root.mainloop()

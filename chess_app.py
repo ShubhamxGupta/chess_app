@@ -24,6 +24,9 @@ class ChessApp:
         self.move_list = tk.Listbox(root, height=20, width=30)
         self.move_list.pack(side=tk.RIGHT)
 
+        self.undo_button = tk.Button(root, text="Undo", command=self.undo_move)
+        self.undo_button.pack()
+
         self.update_board()
     
     def draw_board(self):
@@ -98,6 +101,8 @@ class ChessApp:
                 self.update_move_list()
                 if not self.board.is_game_over():
                     self.computer_move()
+                else:
+                    self.display_game_over()
             self.selected_piece = None
             self.selected_square = None
             self.highlight_squares = []
@@ -110,8 +115,7 @@ class ChessApp:
         self.update_board()
         self.update_move_list()
         if self.board.is_game_over():
-            print("Game over!")
-            print("Result: ", self.board.result())
+            self.display_game_over()
 
     def update_move_list(self):
         self.move_list.delete(0, tk.END)
@@ -123,6 +127,33 @@ class ChessApp:
                 self.move_list.insert(tk.END, san_move)
             except Exception as e:
                 print(f"Error updating move list: {e}")
+
+    def undo_move(self):
+        if len(self.board.move_stack) > 1:
+            self.board.pop()
+            self.board.pop()
+            self.update_board()
+            self.update_move_list()
+
+    def display_game_over(self):
+        result = self.board.result()
+        if self.board.is_checkmate():
+            message = "Checkmate! "
+        elif self.board.is_stalemate():
+            message = "Stalemate! "
+        elif self.board.is_insufficient_material():
+            message = "Insufficient material! "
+        elif self.board.is_seventyfive_moves():
+            message = "75-move rule! "
+        elif self.board.is_fivefold_repetition():
+            message = "Fivefold repetition! "
+        elif self.board.is_variant_draw():
+            message = "Draw! "
+        else:
+            message = "Game over! "
+        message += f"Result: {result}"
+        print(message)
+        tk.messagebox.showinfo("Game Over", message)
 
     def __del__(self):
         self.engine.quit()

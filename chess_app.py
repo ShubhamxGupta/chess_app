@@ -1,5 +1,7 @@
 import tkinter as tk
+from tkinter import messagebox, filedialog
 import chess
+import chess.pgn
 import chess.engine
 
 class ChessApp:
@@ -20,6 +22,7 @@ class ChessApp:
         self.selected_square = None
         self.highlight_squares = []
         self.last_move = None
+        self.ai_difficulty = tk.IntVar(value=2) 
 
         self.move_list = tk.Listbox(root, height=20, width=30)
         self.move_list.pack(side=tk.RIGHT)
@@ -27,8 +30,17 @@ class ChessApp:
         self.undo_button = tk.Button(root, text="Undo", command=self.undo_move)
         self.undo_button.pack()
 
+        self.save_button = tk.Button(root, text="Save Game", command=self.save_game)
+        self.save_button.pack()
+
+        self.load_button = tk.Button(root, text="Load Game", command=self.load_game)
+        self.load_button.pack()
+
+        self.difficulty_menu = tk.OptionMenu(root, self.ai_difficulty, 1, 2, 3, 4, 5)
+        self.difficulty_menu.pack()
+
         self.update_board()
-    
+
     def draw_board(self):
         colors = ["#f0d9b5", "#b58863"]
         for row in range(8):
@@ -95,6 +107,8 @@ class ChessApp:
             target_square = chess.square(col, row)
             move = chess.Move(self.selected_square, target_square)
             if move in self.board.legal_moves:
+                if chess.Move.from_uci(f"{chess.square_name(self.selected_square)}{chess.square_name(target_square)}q") in self.board.legal_moves and self.selected_piece.piece_type == chess.PAWN and (row == 0 or row == 7):
+                    move = chess.Move(self.selected_square, target_square, promotion=chess.QUEEN)
                 self.board.push(move)
                 self.last_move = move
                 self.update_board()
@@ -109,7 +123,8 @@ class ChessApp:
             self.update_board()
 
     def computer_move(self):
-        result = self.engine.play(self.board, chess.engine.Limit(time=2.0))
+        depth = self.ai_difficulty.get()
+        result = self.engine.play(self.board, chess.engine.Limit(depth=depth))
         self.board.push(result.move)
         self.last_move = result.move
         self.update_board()
@@ -154,6 +169,26 @@ class ChessApp:
         message += f"Result: {result}"
         print(message)
         tk.messagebox.showinfo("Game Over", message)
+
+    def save_game(self):
+        file_path = filedialog.asksaveasfilename(defaultextension=".pgn", filetypes=[("PGN files", "*.pgn"), ("All files", "*.*")])
+        if file_path:
+            with open(file_path, "w") as f:
+                exporter = chess.pgn.StringExporter()
+                game = chess.pgn.Game.from_board(self.board)
+                game.accept(exporter)
+                f.write(str(exporter))
+
+    def load_game(self):
+        file_path = filedialog.askopenfilename(filetypes=[("PGN files", "*.pgn"), ("All files", "*.*")])
+        if file_path:
+            with open(file_path, "r") as f:
+                game = chess.pgn.read_game(f)
+                self.board = game.board()
+                for move in game.mainline_moves():
+                    self.board.push(move)
+                self.update_board()
+                self.update_move_list()
 
     def __del__(self):
         self.engine.quit()

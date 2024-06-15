@@ -4,6 +4,7 @@ from PIL import Image, ImageTk
 import chess
 import chess.pgn
 import chess.engine
+import pyperclip
 
 class ChessApp:
     def __init__(self, root, engine_path):
@@ -28,7 +29,8 @@ class ChessApp:
         self.highlight_squares = []
         self.last_move = None
         self.ai_difficulty = tk.IntVar(value=2) 
-
+        self.mode = tk.StringVar(value="AI")  # New variable to track mode
+        
         self.move_list = tk.Listbox(root, height=20, width=30)
         self.move_list.pack(side=tk.RIGHT)
 
@@ -43,6 +45,15 @@ class ChessApp:
 
         self.difficulty_menu = tk.OptionMenu(root, self.ai_difficulty, 1, 2, 3, 4, 5)
         self.difficulty_menu.pack()
+
+        self.mode_menu = tk.OptionMenu(root, self.mode, "AI", "2 Player")
+        self.mode_menu.pack()
+
+        self.copy_pgn_button = tk.Button(root, text="Copy PGN", command=self.copy_pgn)
+        self.copy_pgn_button.pack()
+
+        self.copy_fen_button = tk.Button(root, text="Copy FEN", command=self.copy_fen)
+        self.copy_fen_button.pack()
 
         self.piece_images = self.load_piece_images()
         self.update_board()
@@ -121,7 +132,8 @@ class ChessApp:
                 self.update_board()
                 self.update_move_list()
                 if not self.board.is_game_over():
-                    self.computer_move()
+                    if self.mode.get() == "AI":
+                        self.computer_move()
                 else:
                     self.display_game_over()
             self.selected_piece = None
@@ -130,18 +142,19 @@ class ChessApp:
             self.update_board()
 
     def computer_move(self):
-        try:
-            depth = self.ai_difficulty.get()
-            result = self.engine.play(self.board, chess.engine.Limit(depth=depth))
-            self.board.push(result.move)
-            self.last_move = result.move
-            self.update_board()
-            self.update_move_list()
-            if self.board.is_game_over():
-                self.display_game_over()
-        except Exception as e:
-            print(f"Error in computer move: {e}")
-            tk.messagebox.showerror("Error", "An error occurred while making the computer move.")
+        if self.mode.get() == "AI" and not self.board.is_game_over():
+            try:
+                depth = self.ai_difficulty.get()
+                result = self.engine.play(self.board, chess.engine.Limit(depth=depth))
+                self.board.push(result.move)
+                self.last_move = result.move
+                self.update_board()
+                self.update_move_list()
+                if self.board.is_game_over():
+                    self.display_game_over()
+            except Exception as e:
+                print(f"Error in computer move: {e}")
+                tk.messagebox.showerror("Error", "An error occurred while making the computer move.")
 
     def update_move_list(self):
         self.move_list.delete(0, tk.END)
@@ -204,6 +217,17 @@ class ChessApp:
             except Exception as e:
                 print(f"Error loading game: {e}")
                 tk.messagebox.showerror("Error", "An error occurred while loading the game.")
+
+    def copy_pgn(self):
+        exporter = chess.pgn.StringExporter()
+        game = chess.pgn.Game.from_board(self.board)
+        game.accept(exporter)
+        pyperclip.copy(str(exporter))
+        tk.messagebox.showinfo("PGN Copied", "The PGN has been copied to the clipboard.")
+
+    def copy_fen(self):
+        pyperclip.copy(self.board.fen())
+        tk.messagebox.showinfo("FEN Copied", "The FEN has been copied to the clipboard.")
 
     def __del__(self):
         self.engine.quit()

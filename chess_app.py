@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import messagebox, filedialog, simpledialog
+from PIL import Image, ImageTk
 import chess
 import chess.pgn
 import chess.engine
@@ -10,6 +11,10 @@ class ChessApp:
         self.root.title("Chess App")
         self.board = chess.Board()
         self.engine = chess.engine.SimpleEngine.popen_uci(engine_path)
+        
+        self.board_image = Image.open("images/board.png")
+        self.board_image = self.board_image.resize((480, 480), Image.LANCZOS)
+        self.board_photo = ImageTk.PhotoImage(self.board_image)
         
         self.canvas = tk.Canvas(root, width=480, height=480)
         self.canvas.pack(side=tk.LEFT)
@@ -39,34 +44,32 @@ class ChessApp:
         self.difficulty_menu = tk.OptionMenu(root, self.ai_difficulty, 1, 2, 3, 4, 5)
         self.difficulty_menu.pack()
 
+        self.piece_images = self.load_piece_images()
         self.update_board()
 
+    def load_piece_images(self):
+        piece_names = ['p', 'r', 'n', 'b', 'q', 'k', 'P', 'R', 'N', 'B', 'Q', 'K']
+        piece_images = {}
+        for piece in piece_names:
+            image = Image.open(f"images/{piece.lower()}{'w' if piece.isupper() else 'b'}.png")
+            image = image.resize((60, 60), Image.LANCZOS)
+            piece_images[piece] = ImageTk.PhotoImage(image)
+        return piece_images
+
     def draw_board(self):
-        colors = ["#f0d9b5", "#b58863"]
-        for row in range(8):
-            for col in range(8):
-                x1 = col * 60
-                y1 = row * 60
-                x2 = x1 + 60
-                y2 = y1 + 60
-                color = colors[(row + col) % 2]
-                self.canvas.create_rectangle(x1, y1, x2, y2, fill=color, outline=color)
+        self.canvas.create_image(0, 0, anchor=tk.NW, image=self.board_photo)
                 
         if self.last_move:
             self.highlight_square(self.last_move.from_square, "#aaf")
             self.highlight_square(self.last_move.to_square, "#aaf")
 
     def draw_pieces(self):
-        piece_symbols = {
-            'p': '♟', 'r': '♜', 'n': '♞', 'b': '♝', 'q': '♛', 'k': '♚',
-            'P': '♙', 'R': '♖', 'N': '♘', 'B': '♗', 'Q': '♕', 'K': '♔'
-        }
         for square, piece in self.board.piece_map().items():
-            row = 7 - (square // 8)
-            col = square % 8
-            x = col * 60 + 30
-            y = row * 60 + 30
-            self.canvas.create_text(x, y, text=piece_symbols[piece.symbol()], font=("Arial", 32), fill="black", tags="piece")
+            row = 7 - chess.square_rank(square)
+            col = chess.square_file(square)
+            x = col * 60
+            y = row * 60
+            self.canvas.create_image(x, y, anchor=tk.NW, image=self.piece_images[piece.symbol()], tags="piece")
 
     def highlight_square(self, square, color):
         col = chess.square_file(square)
@@ -75,7 +78,7 @@ class ChessApp:
         y1 = row * 60
         x2 = x1 + 60
         y2 = y1 + 60
-        self.canvas.create_rectangle(x1, y1, x2, y2, fill=color, outline=color, stipple="gray50")
+        self.canvas.create_rectangle(x1, y1, x2, y2, outline=color, width=3, tags="highlight")
 
     def update_board(self):
         self.canvas.delete("all")
@@ -98,7 +101,9 @@ class ChessApp:
     def on_drag(self, event):
         if self.selected_piece:
             self.canvas.delete("selected_piece")
-            self.canvas.create_text(event.x, event.y, text=self.selected_piece.symbol().upper() if self.selected_piece.color else self.selected_piece.symbol().lower(), font=("Arial", 32), fill="red", tags="selected_piece")
+            x = event.x - 30
+            y = event.y - 30
+            self.canvas.create_image(x, y, anchor=tk.NW, image=self.piece_images[self.selected_piece.symbol()], tags="selected_piece")
 
     def on_drop(self, event):
         if self.selected_piece:

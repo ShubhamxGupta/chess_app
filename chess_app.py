@@ -5,6 +5,9 @@ import chess
 import chess.pgn
 import chess.engine
 import pyperclip
+import pygame
+import datetime
+
 
 class ChessApp:
     def __init__(self, root, engine_path):
@@ -28,8 +31,8 @@ class ChessApp:
         self.selected_square = None
         self.highlight_squares = []
         self.last_move = None
-        self.ai_difficulty = tk.IntVar(value=2) 
-        self.mode = tk.StringVar(value="AI")  # New variable to track mode
+        self.ai_difficulty = tk.IntVar(value=1000)
+        self.mode = tk.StringVar(value="AI")
         
         self.move_list = tk.Listbox(root, height=20, width=30)
         self.move_list.pack(side=tk.RIGHT)
@@ -43,7 +46,8 @@ class ChessApp:
         self.load_button = tk.Button(root, text="Load Game", command=self.load_game)
         self.load_button.pack()
 
-        self.difficulty_menu = tk.OptionMenu(root, self.ai_difficulty, 1, 2, 3, 4, 5)
+        difficulty_options = list(range(100, 3100, 100))
+        self.difficulty_menu = tk.OptionMenu(root, self.ai_difficulty, *difficulty_options)
         self.difficulty_menu.pack()
 
         self.mode_menu = tk.OptionMenu(root, self.mode, "AI", "2 Player")
@@ -57,6 +61,16 @@ class ChessApp:
 
         self.piece_images = self.load_piece_images()
         self.update_board()
+
+        # Initialize pygame mixer
+        pygame.mixer.init()
+
+        # Load sounds
+        self.move_sound = pygame.mixer.Sound("sounds/move.wav")
+        self.castle_sound = pygame.mixer.Sound("sounds/castle.wav")
+        self.check_sound = pygame.mixer.Sound("sounds/check.wav")
+        self.promotion_sound = pygame.mixer.Sound("sounds/promotion.wav")
+        self.capture_sound = pygame.mixer.Sound("sounds/capture.wav")
 
     def load_piece_images(self):
         piece_names = ['p', 'r', 'n', 'b', 'q', 'k', 'P', 'R', 'N', 'B', 'Q', 'K']
@@ -127,13 +141,22 @@ class ChessApp:
                     piece = simpledialog.askstring("Promotion", "Promote to (q, r, b, n):", initialvalue="q")
                     if piece in ["q", "r", "b", "n"]:
                         move = chess.Move(self.selected_square, target_square, promotion=chess.Piece.from_symbol(piece).piece_type)
+                        self.play_sound("promotion")
+                elif self.board.is_capture(move):
+                    self.play_sound("capture")
+                elif self.board.is_castling(move):
+                    self.play_sound("castle")
+                else:
+                    self.play_sound("move")
                 self.board.push(move)
                 self.last_move = move
                 self.update_board()
                 self.update_move_list()
                 if not self.board.is_game_over():
+                    if self.board.is_check():
+                        self.play_sound("check")
                     if self.mode.get() == "AI":
-                        self.computer_move()
+                        self.root.after(1000, self.computer_move)  # Delay AI move by 2000ms (2 seconds)
                 else:
                     self.display_game_over()
             self.selected_piece = None
@@ -144,14 +167,24 @@ class ChessApp:
     def computer_move(self):
         if self.mode.get() == "AI" and not self.board.is_game_over():
             try:
-                depth = self.ai_difficulty.get()
+                rating = self.ai_difficulty.get()
+                # Map rating to depth: 100-3000 -> 1-30
+                depth = max(1, min(30, (rating - 100) // 100 + 1))
                 result = self.engine.play(self.board, chess.engine.Limit(depth=depth))
+                if self.board.is_capture(result.move):
+                    self.play_sound("capture")
+                if self.board.is_castling(result.move):
+                    self.play_sound("castle")
+                else:
+                    self.play_sound("move")
                 self.board.push(result.move)
                 self.last_move = result.move
                 self.update_board()
                 self.update_move_list()
                 if self.board.is_game_over():
                     self.display_game_over()
+                elif self.board.is_check():
+                    self.play_sound("check")
             except Exception as e:
                 print(f"Error in computer move: {e}")
                 tk.messagebox.showerror("Error", "An error occurred while making the computer move.")
@@ -200,6 +233,9 @@ class ChessApp:
             with open(file_path, "w") as f:
                 exporter = chess.pgn.StringExporter()
                 game = chess.pgn.Game.from_board(self.board)
+                game.headers["Event"] = "Lets play chess"
+                game.headers["Site"] = "Chess app by Shubham"
+                game.headers["Date"] = datetime.datetime.now().strftime("%Y-%m-%d")
                 game.accept(exporter)
                 f.write(str(exporter))
 
@@ -221,6 +257,9 @@ class ChessApp:
     def copy_pgn(self):
         exporter = chess.pgn.StringExporter()
         game = chess.pgn.Game.from_board(self.board)
+        game.headers["Event"] = "Lets play chess"
+        game.headers["Site"] = "Chess app by Shubham"
+        game.headers["Date"] = datetime.datetime.now().strftime("%Y-%m-%d")
         game.accept(exporter)
         pyperclip.copy(str(exporter))
         tk.messagebox.showinfo("PGN Copied", "The PGN has been copied to the clipboard.")
@@ -231,6 +270,19 @@ class ChessApp:
 
     def __del__(self):
         self.engine.quit()
+        pygame.mixer.quit()
+
+    def play_sound(self, sound_type):
+        if sound_type == "move":
+            self.move_sound.play()
+        elif sound_type == "castle":
+            self.castle_sound.play()
+        elif sound_type == "check":
+            self.check_sound.play()
+        elif sound_type == "promotion":
+            self.promotion_sound.play()
+        elif sound_type == "capture":
+            self.capture_sound.play()
 
 if __name__ == "__main__":
     engine_path = r"stockfish\stockfish-windows-x86-64-avx2.exe"

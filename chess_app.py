@@ -18,11 +18,11 @@ class ChessApp:
         
         # Load and set up the chess board image
         self.board_image = Image.open("images/board.png")
-        self.board_image = self.board_image.resize((480, 480), Image.LANCZOS)
+        self.board_image = self.board_image.resize((600, 600), Image.LANCZOS)
         self.board_photo = ImageTk.PhotoImage(self.board_image)
         
         # Set up the canvas for drawing the board and pieces
-        self.canvas = tk.Canvas(root, width=480, height=480)
+        self.canvas = tk.Canvas(root, width=600, height=600)
         self.canvas.pack(side=tk.LEFT)
         
         # Bind mouse events for piece movement
@@ -87,7 +87,7 @@ class ChessApp:
         piece_images = {}
         for piece in piece_names:
             image = Image.open(f"images/{piece.lower()}{'w' if piece.isupper() else 'b'}.png")
-            image = image.resize((60, 60), Image.LANCZOS)
+            image = image.resize((75, 75), Image.LANCZOS)
             piece_images[piece] = ImageTk.PhotoImage(image)
         return piece_images
 
@@ -105,18 +105,18 @@ class ChessApp:
         for square, piece in self.board.piece_map().items():
             row = 7 - chess.square_rank(square)
             col = chess.square_file(square)
-            x = col * 60
-            y = row * 60
+            x = col * 75
+            y = row * 75
             self.canvas.create_image(x, y, anchor=tk.NW, image=self.piece_images[piece.symbol()], tags="piece")
 
     def highlight_square(self, square, color):
         # Highlight a square on the board
         col = chess.square_file(square)
         row = 7 - chess.square_rank(square)
-        x1 = col * 60
-        y1 = row * 60
-        x2 = x1 + 60
-        y2 = y1 + 60
+        x1 = col * 75
+        y1 = row * 75
+        x2 = x1 + 75
+        y2 = y1 + 75
         self.canvas.create_rectangle(x1, y1, x2, y2, outline=color, width=3, tags="highlight")
 
     def update_board(self):
@@ -127,8 +127,8 @@ class ChessApp:
 
     def on_click(self, event):
         # Handle click event to select a piece
-        col = event.x // 60
-        row = 7 - (event.y // 60)
+        col = event.x // 75
+        row = 7 - (event.y // 75)
         self.selected_square = chess.square(col, row)
         piece = self.board.piece_at(self.selected_square)
         if piece:
@@ -143,15 +143,15 @@ class ChessApp:
         # Handle dragging event to move a piece
         if self.selected_piece:
             self.canvas.delete("selected_piece")
-            x = event.x - 30
-            y = event.y - 30
+            x = event.x - 37.5
+            y = event.y - 37.5
             self.canvas.create_image(x, y, anchor=tk.NW, image=self.piece_images[self.selected_piece.symbol()], tags="selected_piece")
 
     def on_drop(self, event):
         # Handle drop event to place a piece on a new square
         if self.selected_piece:
-            col = event.x // 60
-            row = 7 - (event.y // 60)
+            col = event.x // 75
+            row = 7 - (event.y // 75)
             target_square = chess.square(col, row)
             move = chess.Move(self.selected_square, target_square)
             if move in self.board.legal_moves:

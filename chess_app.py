@@ -39,7 +39,7 @@ class ChessApp:
         self.mode = tk.StringVar(value="AI")
         
         # Set up the move list display
-        self.move_list = tk.Listbox(root, height=20, width=30)
+        self.move_list = tk.Listbox(root, height=37, width=30)
         self.move_list.pack(side=tk.RIGHT)
 
         # Add buttons for undo, save, load, and other functionalities
@@ -75,11 +75,13 @@ class ChessApp:
         pygame.mixer.init()
 
         # Load sound effects for various actions
-        self.move_sound = pygame.mixer.Sound("sounds/move.wav")
-        self.castle_sound = pygame.mixer.Sound("sounds/castle.wav")
-        self.check_sound = pygame.mixer.Sound("sounds/check.wav")
-        self.promotion_sound = pygame.mixer.Sound("sounds/promotion.wav")
-        self.capture_sound = pygame.mixer.Sound("sounds/capture.wav")
+        self.sounds = {
+            "move": pygame.mixer.Sound("sounds/move.wav"),
+            "castle": pygame.mixer.Sound("sounds/castle.wav"),
+            "check": pygame.mixer.Sound("sounds/check.wav"),
+            "promotion": pygame.mixer.Sound("sounds/promotion.wav"),
+            "capture": pygame.mixer.Sound("sounds/capture.wav")
+        }
 
     def load_piece_images(self):
         # Load images for each piece and resize them
@@ -124,6 +126,10 @@ class ChessApp:
         self.canvas.delete("all")
         self.draw_board()
         self.draw_pieces()
+        # Highlight the king in check
+        if self.board.is_check():
+            king_square = self.board.king(self.board.turn)
+            self.highlight_square(king_square, "#f00")
 
     def on_click(self, event):
         # Handle click event to select a piece
@@ -156,7 +162,7 @@ class ChessApp:
             move = chess.Move(self.selected_square, target_square)
             if move in self.board.legal_moves:
                 # Handle pawn promotion
-                if chess.Move.from_uci(f"{chess.square_name(self.selected_square)}{chess.square_name(target_square)}q") in self.board.legal_moves and self.selected_piece.piece_type == chess.PAWN and (row == 0 or row == 7):
+                if (self.selected_piece.piece_type == chess.PAWN and (row == 0 or row == 7)):
                     piece = simpledialog.askstring("Promotion", "Promote to (q, r, b, n):", initialvalue="q")
                     if piece in ["q", "r", "b", "n"]:
                         move = chess.Move(self.selected_square, target_square, promotion=chess.Piece.from_symbol(piece).piece_type)
@@ -217,13 +223,21 @@ class ChessApp:
         # Update the move list display
         self.move_list.delete(0, tk.END)
         temp_board = chess.Board()
+        move_number = 1
+        row_moves = []
         for move in self.board.move_stack:
             try:
                 san_move = temp_board.san(move)
                 temp_board.push(move)
-                self.move_list.insert(tk.END, san_move)
+                row_moves.append(san_move)
+                if len(row_moves) == 2:
+                    self.move_list.insert(tk.END, f"{move_number}. {row_moves[0]} {(15-len(row_moves[0]))*' '} {row_moves[1]}")
+                    move_number += 1
+                    row_moves = []
             except Exception as e:
                 print(f"Error updating move list: {e}")
+        if row_moves:
+            self.move_list.insert(tk.END, f"{move_number}. {row_moves[0]}")
 
     def undo_move(self):
         # Undo the last two moves (for both players)
@@ -259,13 +273,18 @@ class ChessApp:
         file_path = filedialog.asksaveasfilename(defaultextension=".pgn", filetypes=[("PGN files", "*.pgn"), ("All files", "*.*")])
         if file_path:
             with open(file_path, "w") as f:
-                exporter = chess.pgn.StringExporter()
-                game = chess.pgn.Game.from_board(self.board)
-                game.headers["Event"] = "Lets play chess"
-                game.headers["Site"] = "Chess app by Shubham"
-                game.headers["Date"] = datetime.datetime.now().strftime("%Y-%m-%d")
-                game.accept(exporter)
-                f.write(str(exporter))
+                try:
+                    with open(file_path, "w") as f:
+                        exporter = chess.pgn.StringExporter()
+                        game = chess.pgn.Game.from_board(self.board)
+                        game.headers["Event"] = "Let's play chess"
+                        game.headers["Site"] = "Chess app by Shubham"
+                        game.headers["Date"] = datetime.datetime.now().strftime("%Y-%m-%d")
+                        game.accept(exporter)
+                        f.write(str(exporter))
+                except Exception as e:
+                    print(f"Error saving game: {e}")
+                    tk.messagebox.showerror("Error", "An error occurred while saving the game.")
 
     def load_game(self):
         # Load a game from a PGN file
@@ -285,19 +304,27 @@ class ChessApp:
 
     def copy_pgn(self):
         # Copy the current game to the clipboard in PGN format
-        exporter = chess.pgn.StringExporter()
-        game = chess.pgn.Game.from_board(self.board)
-        game.headers["Event"] = "Lets play chess"
-        game.headers["Site"] = "Chess app by Shubham"
-        game.headers["Date"] = datetime.datetime.now().strftime("%Y-%m-%d")
-        game.accept(exporter)
-        pyperclip.copy(str(exporter))
-        tk.messagebox.showinfo("PGN Copied", "The PGN has been copied to the clipboard.")
+        try:
+            exporter = chess.pgn.StringExporter()
+            game = chess.pgn.Game.from_board(self.board)
+            game.headers["Event"] = "Let's play chess"
+            game.headers["Site"] = "Chess app by Shubham"
+            game.headers["Date"] = datetime.datetime.now().strftime("%Y-%m-%d")
+            game.accept(exporter)
+            pyperclip.copy(str(exporter))
+            tk.messagebox.showinfo("PGN Copied", "The PGN has been copied to the clipboard.")
+        except Exception as e:
+            print(f"Error copying PGN: {e}")
+            tk.messagebox.showerror("Error", "An error occurred while copying the PGN.")
 
     def copy_fen(self):
         # Copy the current board position to the clipboard in FEN format
-        pyperclip.copy(self.board.fen())
-        tk.messagebox.showinfo("FEN Copied", "The FEN has been copied to the clipboard.")
+        try:
+            pyperclip.copy(self.board.fen())
+            tk.messagebox.showinfo("FEN Copied", "The FEN has been copied to the clipboard.")
+        except Exception as e:
+            print(f"Error copying FEN: {e}")
+            tk.messagebox.showerror("Error", "An error occurred while copying the FEN.")
 
     def __del__(self):
         # Clean up the engine and mixer when the application is closed
@@ -306,16 +333,9 @@ class ChessApp:
 
     def play_sound(self, sound_type):
         # Play the appropriate sound effect for the given action
-        if sound_type == "move":
-            self.move_sound.play()
-        elif sound_type == "castle":
-            self.castle_sound.play()
-        elif sound_type == "check":
-            self.check_sound.play()
-        elif sound_type == "promotion":
-            self.promotion_sound.play()
-        elif sound_type == "capture":
-            self.capture_sound.play()
+        sound = self.sounds.get(sound_type)
+        if sound:
+            sound.play()
 
 if __name__ == "__main__":
     engine_path = r"stockfish\stockfish-windows-x86-64-avx2.exe"

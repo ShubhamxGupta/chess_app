@@ -1,5 +1,6 @@
 import tkinter as tk
-from tkinter import messagebox, filedialog, simpledialog
+from tkinter import filedialog, simpledialog
+import tkinter.font as tkFont
 from PIL import Image, ImageTk
 import chess
 import chess.pgn
@@ -29,6 +30,10 @@ class ChessApp:
         self.canvas.bind("<Button-1>", self.on_click)
         self.canvas.bind("<B1-Motion>", self.on_drag)
         self.canvas.bind("<ButtonRelease-1>", self.on_drop)
+
+        # Define custom fonts
+        self.custom_font = tkFont.Font(family="Helvetica", size=12, weight="bold")
+        self.move_list_font = tkFont.Font(family="Courier", size=10, underline=True)
         
         # Initialize variables for piece movement and game state
         self.selected_piece = None
@@ -39,19 +44,25 @@ class ChessApp:
         self.mode = tk.StringVar(value="AI")
         
         # Set up the move list display
-        self.move_list = tk.Listbox(root, height=37, width=30)
+        self.move_list = tk.Listbox(root, height=37, width=30, font=self.move_list_font)
         self.move_list.pack(side=tk.RIGHT)
 
+        # Add a status bar at the bottom
+        self.status_bar = tk.Label(root, text="White's Turn", bd=1, relief=tk.SUNKEN, anchor=tk.W, font=self.custom_font)
+        self.status_bar.pack(side=tk.BOTTOM, fill=tk.X)
+
         # Add buttons for undo, save, load, and other functionalities
-        self.undo_button = tk.Button(root, text="Undo", command=self.undo_move)
+        self.undo_button = tk.Button(root, text="Undo", command=self.undo_move, font=self.custom_font)
         self.undo_button.pack()
 
         # Add dropdown menus for AI difficulty and game mode selection
         difficulty_options = list(range(100, 3100, 100))
         self.difficulty_menu = tk.OptionMenu(root, self.ai_difficulty, *difficulty_options)
+        self.difficulty_menu.config(font=self.custom_font)
         self.difficulty_menu.pack()
 
         self.mode_menu = tk.OptionMenu(root, self.mode, "AI", "2 Player")
+        self.mode_menu.config(font=self.custom_font)
         self.mode_menu.pack()
 
         # Load piece images and update the board
@@ -72,6 +83,14 @@ class ChessApp:
 
         # Create a menu bar
         self.create_menu()
+
+        # Tooltips for buttons
+        ToolTip(self.undo_button, "Undo the last move")
+
+        # Tooltips for dropdown menus
+        ToolTip(self.difficulty_menu, "Select AI difficulty level")
+        ToolTip(self.mode_menu, "Choose game mode: AI or 2 Player")
+
 
     def load_piece_images(self):
         # Load images for each piece and resize them
@@ -111,11 +130,23 @@ class ChessApp:
         y2 = y1 + 75
         self.canvas.create_rectangle(x1, y1, x2, y2, outline=color, width=3, tags="highlight")
 
+    def update_status_bar(self):
+        if self.board.is_checkmate():
+            status = "Checkmate! " + ("Black" if self.board.turn else "White") + " wins!"
+        elif self.board.is_stalemate():
+            status = "Stalemate!"
+        elif self.board.is_check():
+            status = "Check! " + ("White's Turn" if self.board.turn else "Black's Turn")
+        else:
+            status = "White's Turn" if self.board.turn else "Black's Turn"
+        self.status_bar.config(text=status)
+
     def update_board(self):
         # Redraw the board and pieces
         self.canvas.delete("all")
         self.draw_board()
         self.draw_pieces()
+        self.update_status_bar()
         # Highlight the king in check
         if self.board.is_check():
             king_square = self.board.king(self.board.turn)
@@ -168,6 +199,7 @@ class ChessApp:
                 self.last_move = move
                 self.update_board()
                 self.update_move_list()
+                self.update_status_bar()
                 # Check for game over and AI move
                 if not self.board.is_game_over():
                     if self.board.is_check():
@@ -180,6 +212,7 @@ class ChessApp:
             self.selected_square = None
             self.highlight_squares = []
             self.update_board()
+            self.update_status_bar()
 
     def computer_move(self):
         # Handle computer move when in AI mode
@@ -215,19 +248,23 @@ class ChessApp:
         temp_board = chess.Board()
         move_number = 1
         row_moves = []
-        for move in self.board.move_stack:
+        for index, move in enumerate(self.board.move_stack):
             try:
                 san_move = temp_board.san(move)
                 temp_board.push(move)
                 row_moves.append(san_move)
                 if len(row_moves) == 2:
-                    self.move_list.insert(tk.END, f"{move_number}. {row_moves[0]} {(15-len(row_moves[0]))*' '} {row_moves[1]}")
+                    self.move_list.insert(tk.END, f"{move_number}. {row_moves[0]} {row_moves[1]}")
                     move_number += 1
                     row_moves = []
+                if index == len(self.board.move_stack) - 1:
+                    self.move_list.itemconfig(tk.END, bg="#D3D3D3")
             except Exception as e:
                 print(f"Error updating move list: {e}")
         if row_moves:
             self.move_list.insert(tk.END, f"{move_number}. {row_moves[0]}")
+            if len(self.board.move_stack) % 2 != 0:
+                self.move_list.itemconfig(tk.END, bg="#D3D3D3")
 
     def undo_move(self):
         # Undo the last two moves (for both players)
@@ -236,6 +273,7 @@ class ChessApp:
             self.board.pop()
             self.update_board()
             self.update_move_list()
+            self.update_status_bar()
 
     def display_game_over(self):
         # Display game over message with result
@@ -287,6 +325,7 @@ class ChessApp:
                         self.board.push(move)
                     self.update_board()
                     self.update_move_list()
+                    self.update_status_bar()
             except Exception as e:
                 print(f"Error loading game: {e}")
                 tk.messagebox.showerror("Error", "An error occurred while loading the game.")
@@ -331,6 +370,7 @@ class ChessApp:
         self.board.reset()
         self.update_board()
         self.update_move_list()
+        self.update_status_bar()
 
     def create_menu(self):
         # Create a menu bar
@@ -352,6 +392,29 @@ class ChessApp:
         edit_menu.add_command(label="Undo", command=self.undo_move)
         edit_menu.add_command(label="Copy PGN", command=self.copy_pgn)
         edit_menu.add_command(label="Copy FEN", command=self.copy_fen)
+
+class ToolTip:
+    def __init__(self, widget, text):
+        self.widget = widget
+        self.text = text
+        self.tooltip = None
+        self.widget.bind("<Enter>", self.show_tooltip)
+        self.widget.bind("<Leave>", self.hide_tooltip)
+
+    def show_tooltip(self, event):
+        x = event.x_root + 20
+        y = event.y_root + 20
+        self.tooltip = tk.Toplevel(self.widget)
+        self.tooltip.wm_overrideredirect(True)
+        self.tooltip.wm_geometry(f"+{x}+{y}")
+        label = tk.Label(self.tooltip, text=self.text, background="yellow", relief="solid", borderwidth=1, font=("Helvetica", 10, "normal"))
+        label.pack()
+
+    def hide_tooltip(self, event):
+        if self.tooltip:
+            self.tooltip.destroy()
+            self.tooltip = None
+
 
 if __name__ == "__main__":
     engine_path = r"stockfish\stockfish-windows-x86-64-avx2.exe"

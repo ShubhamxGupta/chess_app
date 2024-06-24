@@ -46,12 +46,6 @@ class ChessApp:
         self.undo_button = tk.Button(root, text="Undo", command=self.undo_move)
         self.undo_button.pack()
 
-        self.save_button = tk.Button(root, text="Save Game", command=self.save_game)
-        self.save_button.pack()
-
-        self.load_button = tk.Button(root, text="Load Game", command=self.load_game)
-        self.load_button.pack()
-
         # Add dropdown menus for AI difficulty and game mode selection
         difficulty_options = list(range(100, 3100, 100))
         self.difficulty_menu = tk.OptionMenu(root, self.ai_difficulty, *difficulty_options)
@@ -59,13 +53,6 @@ class ChessApp:
 
         self.mode_menu = tk.OptionMenu(root, self.mode, "AI", "2 Player")
         self.mode_menu.pack()
-
-        # Add buttons for copying PGN and FEN
-        self.copy_pgn_button = tk.Button(root, text="Copy PGN", command=self.copy_pgn)
-        self.copy_pgn_button.pack()
-
-        self.copy_fen_button = tk.Button(root, text="Copy FEN", command=self.copy_fen)
-        self.copy_fen_button.pack()
 
         # Load piece images and update the board
         self.piece_images = self.load_piece_images()
@@ -82,6 +69,9 @@ class ChessApp:
             "promotion": pygame.mixer.Sound("sounds/promotion.wav"),
             "capture": pygame.mixer.Sound("sounds/capture.wav")
         }
+
+        # Create a menu bar
+        self.create_menu()
 
     def load_piece_images(self):
         # Load images for each piece and resize them
@@ -272,19 +262,18 @@ class ChessApp:
         # Save the current game to a PGN file
         file_path = filedialog.asksaveasfilename(defaultextension=".pgn", filetypes=[("PGN files", "*.pgn"), ("All files", "*.*")])
         if file_path:
-            with open(file_path, "w") as f:
-                try:
-                    with open(file_path, "w") as f:
-                        exporter = chess.pgn.StringExporter()
-                        game = chess.pgn.Game.from_board(self.board)
-                        game.headers["Event"] = "Let's play chess"
-                        game.headers["Site"] = "Chess app by Shubham"
-                        game.headers["Date"] = datetime.datetime.now().strftime("%Y-%m-%d")
-                        game.accept(exporter)
-                        f.write(str(exporter))
-                except Exception as e:
-                    print(f"Error saving game: {e}")
-                    tk.messagebox.showerror("Error", "An error occurred while saving the game.")
+            try:
+                exporter = chess.pgn.StringExporter()
+                game = chess.pgn.Game.from_board(self.board)
+                game.headers["Event"] = "Let's play chess"
+                game.headers["Site"] = "Chess app by Shubham"
+                game.headers["Date"] = datetime.datetime.now().strftime("%Y-%m-%d")
+                game.accept(exporter)
+                with open(file_path, "w") as f:
+                    f.write(str(exporter))
+            except Exception as e:
+                print(f"Error saving game: {e}")
+                tk.messagebox.showerror("Error", "An error occurred while saving the game.")
 
     def load_game(self):
         # Load a game from a PGN file
@@ -336,6 +325,33 @@ class ChessApp:
         sound = self.sounds.get(sound_type)
         if sound:
             sound.play()
+
+    def new_game(self):
+        # Start a new game
+        self.board.reset()
+        self.update_board()
+        self.update_move_list()
+
+    def create_menu(self):
+        # Create a menu bar
+        menu_bar = tk.Menu(self.root)
+        self.root.config(menu=menu_bar)
+
+        # Add file menu
+        file_menu = tk.Menu(menu_bar, tearoff=0)
+        menu_bar.add_cascade(label="File", menu=file_menu)
+        file_menu.add_command(label="New Game", command=self.new_game)
+        file_menu.add_command(label="Save Game", command=self.save_game)
+        file_menu.add_command(label="Load Game", command=self.load_game)
+        file_menu.add_separator()
+        file_menu.add_command(label="Exit", command=self.root.quit)
+
+        # Add edit menu
+        edit_menu = tk.Menu(menu_bar, tearoff=0)
+        menu_bar.add_cascade(label="Edit", menu=edit_menu)
+        edit_menu.add_command(label="Undo", command=self.undo_move)
+        edit_menu.add_command(label="Copy PGN", command=self.copy_pgn)
+        edit_menu.add_command(label="Copy FEN", command=self.copy_fen)
 
 if __name__ == "__main__":
     engine_path = r"stockfish\stockfish-windows-x86-64-avx2.exe"

@@ -26,6 +26,8 @@ class ChessApp:
         self.canvas = tk.Canvas(root, width=600, height=600)
         self.canvas.pack(side=tk.LEFT)
         
+        # self.root.bind("<Configure>", self.on_resize)
+
         # Bind mouse events for piece movement
         self.canvas.bind("<Button-1>", self.on_click)
         self.canvas.bind("<B1-Motion>", self.on_drag)
@@ -56,7 +58,7 @@ class ChessApp:
         self.undo_button.pack()
 
         # Add dropdown menus for AI difficulty and game mode selection
-        difficulty_options = list(range(100, 3100, 100))
+        difficulty_options = list(range(100, 3100, 300))
         self.difficulty_menu = tk.OptionMenu(root, self.ai_difficulty, *difficulty_options)
         self.difficulty_menu.config(font=self.custom_font)
         self.difficulty_menu.pack()
@@ -407,7 +409,7 @@ class ToolTip:
         self.tooltip = tk.Toplevel(self.widget)
         self.tooltip.wm_overrideredirect(True)
         self.tooltip.wm_geometry(f"+{x}+{y}")
-        label = tk.Label(self.tooltip, text=self.text, background="yellow", relief="solid", borderwidth=1, font=("Helvetica", 10, "normal"))
+        label = tk.Label(self.tooltip, text=self.text, background="white", relief="solid", borderwidth=1, font=("Helvetica", 10, "normal"))
         label.pack()
 
     def hide_tooltip(self, event):
